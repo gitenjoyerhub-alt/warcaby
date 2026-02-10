@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gra w Warcaby</title>
+    <style>
+body {
+font-family: Arial, sans-serif;
+height: 100vh;
+margin: 0;
+background: linear-gradient(135deg, #8e9eab, #eef2f3);
+display: flex;
+flex-direction: column;
+align-items: center;
+}
+
+h1 {
+margin-top: 20px;
+margin-bottom: 20px;
+font-size: 32px;
+letter-spacing: 2px;
+}
+h2{
+    margin-top: 20px;
+    margin-bottom: 20px;
+    font-size: 32px;
+    letter-spacing: 2px
+}
+h3{
+    margin-top: 20px;
+    margin-bottom: 20px;
+    font-size: 20px;
+    letter-spacing: 2px
+}
+
+.board {
+display: grid;
+grid-template-columns: repeat(8, 60px);
+grid-template-rows: repeat(8, 60px);
+border: 6px solid #3b2f2f;
+box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+background-color: #3b2f2f;
+}
+
+.square {
+width: 60px;
+height: 60px;
+display: flex;
+justify-content: center;
+align-items: center;
+}
+
+.square.black {
+background-color: #3b2f2f;
+}
+
+.square.white {
+background-color: #f0d9b5;
+}
+
+.piece {
+width: 46px;
+height: 46px;
+border-radius: 50%;
+background-color: #d9534f;
+box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+cursor: pointer;
+}
+
+.piece2 {
+background-color: #4a62e7;
+}
+
+.piece.king {
+background: radial-gradient(circle, gold 40%, #cfa100 60%);
+border: 2px solid #333;
+}
+</style>
+    </style>
+</head>
+<body>
+    <h1>Gra w Warcaby</h1>
+    <h2>Zasady Gry w Warcaby:</h2>
+    <h3>1.2 graczy<br>
+        2.plansza 8x8<br>
+        3.12 pionków na osobe<br>
+        3.Ruch po skosie<br>
+        4.Bicie obowiazkowe<br>
+        5.wygrywa ten co zbije wszystkie pionki przeciwnika<br>
+    </h3>
+    <div id="board" class="board"></div>
+    <script>
+        const boardElement = document.getElementById('board');
+        const boardSize = 8;
+        let board = [];
+        let selectedPiece = null;
+        let currentPlayer = 'red';
+
+        // Inicjalizacja planszy
+        function createBoard() {
+            board = [];
+            boardElement.innerHTML = ''; // Wyczyść planszę
+
+            for (let row = 0; row < boardSize; row++) {
+                let rowArr = [];
+                for (let col = 0; col < boardSize; col++) {
+                    const square = document.createElement('div');
+                    square.classList.add('square');
+                    if ((row + col) % 2 === 0) {
+                        square.classList.add('white');
+                    } else {
+                        square.classList.add('black');
+                    }
+                    square.dataset.row = row;
+                    square.dataset.col = col;
+                    square.addEventListener('click', handleSquareClick);
+                    boardElement.appendChild(square);
+                    rowArr.push(square);
+                }
+                board.push(rowArr);
+            }
+
+            // Ustaw pionki
+            setupPieces();
+        }
+
+        // Ustawienie pionków na planszy
+        function setupPieces() {
+            for (let row = 0; row < boardSize; row++) {
+                for (let col = 0; col < boardSize; col++) {
+                    if ((row + col) % 2 !== 0) { // Tylko ciemne pola
+                        if (row < 3) {
+                            const piece = document.createElement('div');
+                            piece.classList.add('piece2')
+                            piece.classList.add('piece');
+                            piece.classList.add('red');
+                            piece.dataset.player = 'red';
+                            piece.dataset.row = row;
+                            piece.dataset.col = col;
+                            board[row][col].appendChild(piece);
+                        } else if (row > 4) {
+                            const piece = document.createElement('div');
+                            piece.classList.add('piece');
+                            piece.classList.add('black');
+                            piece.dataset.player = 'black';
+                            piece.dataset.row = row;
+                            piece.dataset.col = col;
+                            board[row][col].appendChild(piece);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Obsługuje kliknięcia na kwadraty
+        function handleSquareClick(event) {
+            const square = event.target;
+            const row = parseInt(square.dataset.row);
+            const col = parseInt(square.dataset.col);
+
+            const piece = square.querySelector('.piece');
+            
+            if (selectedPiece) {
+                // Jeśli kliknięto puste pole, spróbuj przenieść pionek
+                if (!piece) {
+                    if (isValidMove(selectedPiece, row, col)) {
+                        movePiece(selectedPiece, square);
+                        selectedPiece = null;
+                        currentPlayer = currentPlayer === 'red' ? 'black' : 'red';
+                    }
+                }
+            } else {
+                // Jeśli kliknięto pionek, zaznacz go
+                if (piece && piece.dataset.player === currentPlayer) {
+                    selectedPiece = piece;
+                    selectedPiece.style.border = '2px solid blue'; // Zaznaczenie wybranego pionka
+                }
+            }
+        }
+
+        // Sprawdzanie, czy ruch jest dozwolony
+        function isValidMove(piece, toRow, toCol) {
+            const fromRow = parseInt(piece.dataset.row);
+            const fromCol = parseInt(piece.dataset.col);
+
+            // Sprawdzanie, czy ruch jest na puste pole
+            if (board[toRow][toCol].querySelector('.piece')) return false;
+
+            const rowDiff = Math.abs(toRow - fromRow);
+            const colDiff = Math.abs(toCol - fromCol);
+
+            // Sprawdzanie, czy ruch jest o 1 pole
+            if (rowDiff === 1 && colDiff === 1) {
+                return true;
+            }
+
+            // Sprawdzanie, czy pionek wykonuje skok
+            if (rowDiff === 2 && colDiff === 2) {
+                const middleRow = (fromRow + toRow) / 2;
+                const middleCol = (fromCol + toCol) / 2;
+                const middleSquare = board[middleRow][middleCol];
+                const middlePiece = middleSquare.querySelector('.piece');
+                if (middlePiece && middlePiece.dataset.player !== currentPlayer) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // Przenoszenie pionka
+        function movePiece(fromPiece, toSquare) {
+            const fromRow = parseInt(fromPiece.dataset.row);
+            const fromCol = parseInt(fromPiece.dataset.col);
+            const toRow = parseInt(toSquare.dataset.row);
+            const toCol = parseInt(toSquare.dataset.col);
+
+            // Przeniesienie pionka
+            toSquare.appendChild(fromPiece);
+            fromPiece.dataset.row = toRow;
+            fromPiece.dataset.col = toCol;
+
+            // Jeśli skok, usuń zbity pionek
+            if (Math.abs(fromRow - toRow) === 2) {
+                const middleRow = (fromRow + toRow) / 2;
+                const middleCol = (fromCol + toCol) / 2;
+                board[middleRow][middleCol].innerHTML = ''; // Usuwanie zbitego pionka
+            }
+        }
+
+        // Inicjalizuj planszę
+        createBoard();
+    </script>
+</body>
+</html>
