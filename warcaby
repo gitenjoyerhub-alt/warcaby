@@ -86,8 +86,7 @@ border: 2px solid #333;
         2.plansza 8x8<br>
         3.12 pionków na osobe<br>
         3.Ruch po skosie<br>
-        4.Bicie obowiazkowe<br>
-        5.wygrywa ten co zbije wszystkie pionki przeciwnika<br>
+        4.wygrywa ten co zbije wszystkie pionki przeciwnika<br>
     </h3>
     <div id="board" class="board"></div>
     <script>
