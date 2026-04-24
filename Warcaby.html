@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>Warcaby PRO+</title>
+
+<style>
+/* ===== WYGLĄD STRONY ===== */
+body {
+    font-family: Arial;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: linear-gradient(135deg, #8e9eab, #eef2f3);
+}
+
+/* ===== PLANSZA ===== */
+.board {
+    display: grid;
+    grid-template-columns: repeat(8, 60px);
+    grid-template-rows: repeat(8, 60px);
+    border: 5px solid black;
+}
+
+/* ===== POLA ===== */
+.square { width: 60px; height: 60px; }
+.white { background: #f0d9b5;}
+.black { background: #3b2f2f; }
+
+/* ===== PIONKI ===== */
+.piece {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    margin: 7px auto;
+    cursor: pointer;
+}
+.piece{
+    transition: all 0.3s ease;
+}
+
+.piece.move{
+    transform: scale(1.2);
+}
+
+.red { background: red;}
+.blackPiece { background: rgb(49, 121, 237); }
+
+/* ===== DAMKA ===== */
+.king { border: 3px solid gold; }
+
+/* ===== PODŚWIETLENIE RUCHÓW ===== */
+.highlight { outline: 3px solid yellow; }
+</style>
+</head>
+
+<body>
+
+<div>
+    <button onclick="restartGAME()">Restart</button>
+    <button onclick="restartWINS()">Reset wynikow</button>
+</div>
+
+<div>
+    Wygrane 🔴: <span id="redWins">0</span> | 🔵: <span id="blackWins">0</span>
+</div>
+<!-- ===== WYBÓR TRYBU GRY ===== -->
+<div>
+Tryb gry:
+<select id="mode">
+  <option value="ai">Gracz vs AI</option>
+  <option value="pvp">Gracz vs Gracz</option>
+</select>
+</div>
+
+<!-- ===== INFORMACJA O TURZE ===== -->
+<h2 id="turn">Tura: 🔴</h2>
+
+<!-- ===== WYNIK ===== -->
+<div>
+🔴 <span id="redScore">12</span> | 🔵 <span id="blackScore">12</span>
+</div>
+
+<!-- ===== PLANSZA ===== -->
+<div id="board" class="board"></div>
+
+<script>
+
+let redWins = Number(localStorage.getItem('redWins')) || 0;
+let blackWins = Number(localStorage.getItem('blackWins')) || 0;
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('redWins').textContent = redWins;
+    document.getElementById('blackWins').textContent = blackWins;
+})
+
+function restartGAME(){
+    location.reload();
+}
+
+function restartWINS(){
+    localStorage.clear();
+    location.reload();
+}
+// ===== ELEMENT DOM ===== //
+const boardEl = document.getElementById('board');
+
+// ===== STAN GRY ===== //
+let board = [];        // tablica planszy //
+let selected = null;  // aktualnie wybrany pionek //
+let current = 'red';  // aktualny gracz //
+
+// ===== WYNIK ===== //
+let redScore = 12, blackScore = 12;
+
+// ===== TRYB GRY ===== //
+let mode = 'ai'; // domyślnie vs komputer //
+
+// zmiana trybu z selecta //
+document.getElementById('mode').addEventListener('change', (e) => {
+  mode = e.target.value;
+});
+
+// ===== TWORZENIE PLANSZY ===== //
+function createBoard(){
+ for(let r=0;r<8;r++){
+  board[r]=[];
+  for(let c=0;c<8;c++){
+
+   const sq=document.createElement('div');
+
+   // kolor pola (szachownica) //
+   sq.className='square '+((r+c)%2?'black':'white');
+
+   // zapis pozycji //
+   sq.dataset.r=r; 
+   sq.dataset.c=c;
+
+   // kliknięcie //
+   sq.onclick=click;
+
+   boardEl.appendChild(sq);
+   board[r][c]=sq;
+  }
+ }
+ setup(); // ustaw pionki //
+}
+
+// ===== STARTOWE USTAWIENIE ===== //
+function setup(){
+ for(let r=0;r<8;r++){
+  for(let c=0;c<8;c++){
+   if((r+c)%2){
+
+    // czarne na górze //
+    if(r<3) add(r,c,'black');
+
+    // czerwone na dole //
+    if(r>4) add(r,c,'red');
+   }
+  }
+ }
+}
+
+// ===== DODANIE PIONKA ===== //
+function add(r,c,p){
+ const el=document.createElement('div');
+
+ el.className='piece '+(p==='red'?'red':'blackPiece');
+
+ // zapis danych pionka //
+ el.dataset.p=p; 
+ el.dataset.r=r; 
+ el.dataset.c=c;
+
+ board[r][c].appendChild(el);
+}
+
+// ===== KLIKNIĘCIE ===== //
+function click(e){
+ const sq=e.currentTarget;
+ const piece=sq.querySelector('.piece');
+ const r=+sq.dataset.r, c=+sq.dataset.c;
+
+ // jeśli mamy wybrany pionek //
+ if(selected){
+
+  if(valid(selected,r,c)){
+   move(selected,r,c);
+
+   // jeśli brak dalszego bicia → zmiana tury //
+   if(!canCapture(selected)){
+    switchTurn();
+
+    // AI rusza się tylko w trybie AI //
+    if(mode === 'ai' && current === 'black'){
+      setTimeout(ai,300);
+    }
+   }
+  }
+
+ } 
+ // wybór pionka //
+ else if(
+  piece && 
+  piece.dataset.p===current &&
+
+  // w AI gracz steruje tylko czerwonymi //
+  (mode === 'pvp' || current === 'red')
+ ){
+  selected=piece;
+  highlight(piece);
+ }
+}
+
+// ===== SPRAWDZENIE RUCHU ===== //
+function valid(p,tr,tc){
+
+ // pole zajęte → nie można //
+ if(board[tr][tc].querySelector('.piece')) return false;
+
+ const fr=+p.dataset.r, fc=+p.dataset.c;
+ const dr=tr-fr, dc=tc-fc;
+
+ const dir=p.dataset.p==='red'?-1:1;
+ const king=p.classList.contains('king');
+
+ // zwykły ruch //
+ if(Math.abs(dr)===1 && Math.abs(dc)===1){
+  return king || dr===dir;
+ }
+
+ // bicie //
+ if(Math.abs(dr)===2 && Math.abs(dc)===2){
+  const mid=board[(fr+tr)/2][(fc+tc)/2].querySelector('.piece');
+  return mid && mid.dataset.p!==p.dataset.p;
+ }
+
+ return false;
+}
+
+// ===== WYKONANIE RUCHU ===== //
+function move(p,tr,tc){
+ const fr=+p.dataset.r, fc=+p.dataset.c;
+ p.classList.add('move');
+ setTimeout(()=>p.classList.remove('move'),300);
+
+ // przeniesienie pionka //
+ board[tr][tc].appendChild(p);
+ p.dataset.r=tr; 
+ p.dataset.c=tc;
+
+ // bicie pionka //
+ if(Math.abs(fr-tr)===2){
+  const mr=(fr+tr)/2, mc=(fc+tc)/2;
+  const cap=board[mr][mc].querySelector('.piece');
+
+  // aktualizacja punktów //
+  if(cap.dataset.p==='red') redScore--; 
+  else blackScore--;
+
+  board[mr][mc].innerHTML='';
+  updateScore();
+ }
+
+ // awans na damkę //
+ if((p.dataset.p==='red'&&tr===0)||(p.dataset.p==='black'&&tr===7)){
+  p.classList.add('king');
+ }
+
+ selected=p;
+ highlight(p);
+ checkWin();
+}
+
+// ===== CZY MOŻNA BIĆ DALEJ ===== //
+function canCapture(p){
+ const r=+p.dataset.r, c=+p.dataset.c;
+
+ for(let dr of [-2,2]){
+  for(let dc of [-2,2]){
+   let nr=r+dr,nc=c+dc;
+
+   if(nr>=0&&nr<8&&nc>=0&&nc<8){
+    if(valid(p,nr,nc)) return true;
+   }
+  }
+ }
+ return false;
+}
+
+// ===== ZMIANA TURY ===== //
+function switchTurn(){
+ selected=null;
+
+ current=current==='red'?'black':'red';
+
+ document.getElementById('turn').textContent=
+   'Tura: '+(current==='red'?'🔴':'🔵');
+
+ clear();
+}
+
+// ===== AI (KOMPUTER) ===== //
+function ai(){
+ let captures=[], moves=[];
+
+ // znajdź wszystkie ruchy czarnych //
+ document.querySelectorAll('.piece[data-p="black"]').forEach(p=>{
+  let r=+p.dataset.r, c=+p.dataset.c;
+
+  [[1,1],[1,-1],[-1,1],[-1,-1],[2,2],[2,-2],[-2,2],[-2,-2]]
+  .forEach(([dr,dc])=>{
+   let nr=r+dr,nc=c+dc;
+
+   if(nr>=0&&nr<8&&nc>=0&&nc<8 && valid(p,nr,nc)){
+
+    // priorytet: bicie //
+    if(Math.abs(dr)===2) captures.push({p,nr,nc});
+    else moves.push({p,nr,nc});
+   }
+  });
+ });
+
+ let list=captures.length?captures:moves;
+
+ if(list.length){
+  let m=list[Math.floor(Math.random()*list.length)];
+
+  move(m.p,m.nr,m.nc);
+
+  // kolejne bicie //
+  if(!canCapture(m.p)) switchTurn(); 
+  else setTimeout(ai,300);
+ }
+}
+
+// ===== PODŚWIETLENIE ===== //
+function highlight(p){
+ clear();
+ let r=+p.dataset.r, c=+p.dataset.c;
+
+ for(let dr=-2;dr<=2;dr++){
+  for(let dc=-2;dc<=2;dc++){
+   let nr=r+dr,nc=c+dc;
+
+   if(nr>=0&&nr<8&&nc>=0&&nc<8 && valid(p,nr,nc)){
+    board[nr][nc].classList.add('highlight');
+   }
+  }
+ }
+}
+
+// ===== USUWANIE PODŚWIETLENIA ===== //
+function clear(){
+ document.querySelectorAll('.highlight')
+ .forEach(e=>e.classList.remove('highlight'));
+}
+
+// ===== AKTUALIZACJA WYNIKU ===== //
+function updateScore(){
+ document.getElementById('redScore').textContent=redScore;
+ document.getElementById('blackScore').textContent=blackScore;
+}
+
+// ===== SPRAWDZENIE WYGRANEJ ===== //
+checkWin = function(){
+    if(redScore===0){
+        blackWins++;
+        localStorage.setItem('blackWins', blackWins);
+    }
+        if(blackScore===0){
+        redWins++;
+        localStorage.setItem('redWins', redWins);
+    }
+}
+
+// ===== START GRY =====
+createBoard();
+</script>
+
+</body>
+</html>
